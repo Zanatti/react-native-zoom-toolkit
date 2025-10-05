@@ -28,12 +28,12 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   longPressDuration = 500,
   scrollRef,
   onTap,
-  onDoubleTap,
   onPinchStart,
   onPinchEnd,
   onLongPress,
   onUpdate,
   onGestureEnd,
+  onVerticalSwipe, // Add new prop for vertical swipe
 }) => {
   const containerRef = useAnimatedRef();
 
@@ -149,21 +149,11 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const tap = Gesture.Tap()
     .withTestId('tap')
     .enabled(gesturesEnabled)
-    .maxDuration(90) // changed from 250 to 90
-    .maxDelay(70) // added - keeps the gesture from lingering after touch-up
-    .maxDistance(12) // added - stops slow drags from being treated as taps
-    .minPointers(1)
+    .maxDuration(50)
     .numberOfTaps(1)
+    .minPointers(1)
     .runOnJS(true)
     .onEnd((e) => onTap?.(e));
-
-  const doubleTap = Gesture.Tap()
-    .withTestId('doubleTap')
-    .enabled(gesturesEnabled)
-    .numberOfTaps(2)
-    .maxDuration(250)
-    .runOnJS(true)
-    .onEnd((e) => onDoubleTap?.(e));
 
   const longPress = Gesture.LongPress()
     .withTestId('longPress')
@@ -171,6 +161,25 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     .minDuration(longPressDuration)
     .runOnJS(true)
     .onStart((e) => onLongPress?.(e));
+
+  // Add pan gesture for vertical swipe to dismiss
+  const pan = Gesture.Pan()
+    .withTestId('pan')
+    .enabled(gesturesEnabled)
+    .maxPointers(1)
+    .minDistance(20)
+    .runOnJS(true)
+    .onEnd((e) => {
+      const isVerticalSwipe = Math.abs(e.velocityY) > Math.abs(e.velocityX) && Math.abs(e.velocityY) > 500;
+      if (isVerticalSwipe) {
+        // Call specific vertical swipe callback if provided, otherwise fallback to onGestureEnd
+        if (onVerticalSwipe) {
+          onVerticalSwipe(e.velocityY > 0 ? 'down' : 'up');
+        } else {
+          onGestureEnd?.();
+        }
+      }
+    });
 
   const containerStyle = useAnimatedStyle(
     () => ({
@@ -196,10 +205,10 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     };
   }, [childrenSize, translate, scale]);
 
-  const composedTapGesture = Gesture.Exclusive(doubleTap, tap, longPress);
+  const composedTapGesture = Gesture.Exclusive(tap, longPress);
 
   return (
-    <GestureDetector gesture={Gesture.Race(pinch, composedTapGesture)}>
+    <GestureDetector gesture={Gesture.Race(pinch, pan, composedTapGesture)}>
       <Animated.View style={containerStyle} ref={containerRef}>
         <Animated.View style={childStyle}>{children}</Animated.View>
       </Animated.View>

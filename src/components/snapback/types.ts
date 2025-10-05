@@ -49,6 +49,7 @@ export type SnapBackZoomProps = React.PropsWithChildren<
     scrollRef: BlocksGesture;
     onGestureEnd: () => void;
     onUpdate: (e: SnapbackZoomState<number>) => void;
+    onVerticalSwipe: (direction: 'up' | 'down') => void;
   }>
 > &
   PinchGestureCallbacks &
