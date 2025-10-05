@@ -149,7 +149,10 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const tap = Gesture.Tap()
     .withTestId('tap')
     .enabled(gesturesEnabled)
-    .maxDuration(120)
+    .maxDuration(90) // changed from 250 to 90
+    .maxDelay(70) // added - keeps the gesture from lingering after touch-up
+    .maxDistance(12) // added - stops slow drags from being treated as taps
+    .minPointers(1)
     .numberOfTaps(1)
     .runOnJS(true)
     .onEnd((e) => onTap?.(e));
