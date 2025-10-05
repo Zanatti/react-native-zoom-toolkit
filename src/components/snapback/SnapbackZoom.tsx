@@ -162,15 +162,17 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     .runOnJS(true)
     .onStart((e) => onLongPress?.(e));
 
-  // Add pan gesture for vertical swipe to dismiss
+  // Add pan gesture for vertical swipe to dismiss - make it more restrictive
   const pan = Gesture.Pan()
     .withTestId('pan')
     .enabled(gesturesEnabled)
     .maxPointers(1)
-    .minDistance(20)
+    .minDistance(50) // Require more movement before activating
+    .activeOffsetY([-10, 10]) // Only activate for significant vertical movement
+    .failOffsetX([-20, 20]) // Fail if there's too much horizontal movement
     .runOnJS(true)
     .onEnd((e) => {
-      const isVerticalSwipe = Math.abs(e.velocityY) > Math.abs(e.velocityX) && Math.abs(e.velocityY) > 500;
+      const isVerticalSwipe = Math.abs(e.velocityY) > Math.abs(e.velocityX) && Math.abs(e.velocityY) > 800;
       if (isVerticalSwipe) {
         // Call specific vertical swipe callback if provided, otherwise fallback to onGestureEnd
         if (onVerticalSwipe) {
