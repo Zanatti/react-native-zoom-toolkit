@@ -39,6 +39,17 @@ export type SnapbackZoomState<T> = {
   resize?: SizeVector<T>;
 } & CommonTransformState<T>;
 
+export type VerticalSwipeEvent =
+  | { phase: 'start' }
+  | { phase: 'update'; translationY: number }
+  | {
+      phase: 'end';
+      translationY: number;
+      velocityY: number;
+      direction: 'up' | 'down';
+    }
+  | { phase: 'finalize' | 'cancel' };
+
 export type SnapBackZoomProps = React.PropsWithChildren<
   Partial<{
     resizeConfig: ResizeConfig;
@@ -49,7 +60,7 @@ export type SnapBackZoomProps = React.PropsWithChildren<
     scrollRef: BlocksGesture;
     onGestureEnd: () => void;
     onUpdate: (e: SnapbackZoomState<number>) => void;
-    onVerticalSwipe: (direction: 'up' | 'down') => void;
+    onVerticalSwipe?: (event: VerticalSwipeEvent) => void;
   }>
 > &
   PinchGestureCallbacks &

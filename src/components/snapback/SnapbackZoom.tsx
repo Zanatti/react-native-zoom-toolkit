@@ -15,7 +15,11 @@ import { useSizeVector } from '../../commons/hooks/useSizeVector';
 import { resizeToAspectRatio } from '../../commons/utils/resizeToAspectRatio';
 import withSnapbackValidation from '../../commons/hoc/withSnapbackValidation';
 
-import type { SnapBackZoomProps, SnapbackZoomState } from './types';
+import type {
+  SnapBackZoomProps,
+  SnapbackZoomState,
+  VerticalSwipeEvent,
+} from './types';
 
 const DEFAULT_HITSLOP = { vertical: 0, horizontal: 0 };
 
@@ -33,9 +37,9 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   onLongPress,
   onUpdate,
   onGestureEnd,
-  onVerticalSwipe, // Add new prop for vertical swipe
+  onVerticalSwipe,
 }) => {
-  const containerRef = useAnimatedRef();
+  const containerRef = useAnimatedRef<Animated.View>();
 
   const translate = useVector(0, 0);
   const scale = useSharedValue<number>(1);
@@ -53,12 +57,12 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const measureContainer = () => {
     'worklet';
 
-    const measuremet = measure(containerRef);
-    if (measuremet !== null) {
-      containerSize.width.value = measuremet.width;
-      containerSize.height.value = measuremet.height;
-      position.x.value = measuremet.pageX;
-      position.y.value = measuremet.pageY;
+    const measurement = measure(containerRef);
+    if (measurement !== null) {
+      containerSize.width.value = measurement.width;
+      containerSize.height.value = measurement.height;
+      position.x.value = measurement.pageX;
+      position.y.value = measurement.pageY;
     }
   };
 
@@ -149,7 +153,9 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const tap = Gesture.Tap()
     .withTestId('tap')
     .enabled(gesturesEnabled)
-    .maxDuration(50)
+    .maxDuration(110)
+    .maxDelay(80)
+    .maxDistance(18)
     .numberOfTaps(1)
     .minPointers(1)
     .runOnJS(true)
@@ -162,26 +168,42 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     .runOnJS(true)
     .onStart((e) => onLongPress?.(e));
 
-  // Add pan gesture for vertical swipe to dismiss - only activate for clear vertical swipes
+  const invokeVerticalSwipe = (event: VerticalSwipeEvent) => {
+    if (onVerticalSwipe) {
+      onVerticalSwipe(event);
+    }
+  };
+
   const pan = Gesture.Pan()
     .withTestId('pan')
     .enabled(gesturesEnabled)
     .maxPointers(1)
-    .minDistance(80) // Require significant movement
-    .activeOffsetY([-30, 30]) // Only activate for substantial vertical movement
-    .failOffsetX([-15, 15]) // Fail if there's any significant horizontal movement
-    .activateAfterLongPress(200) // Don't activate immediately - wait a bit
-    .runOnJS(true)
-    .onEnd((e) => {
-      const isVerticalSwipe = Math.abs(e.velocityY) > Math.abs(e.velocityX) && Math.abs(e.velocityY) > 1000;
-      if (isVerticalSwipe) {
-        // Call specific vertical swipe callback if provided, otherwise fallback to onGestureEnd
-        if (onVerticalSwipe) {
-          onVerticalSwipe(e.velocityY > 0 ? 'down' : 'up');
-        } else {
-          onGestureEnd?.();
-        }
-      }
+    .minDistance(10)
+    .activeOffsetY([-24, 24])
+    .failOffsetX([-16, 16])
+    .onBegin(() => {
+      'worklet';
+      runOnJS(invokeVerticalSwipe)({ phase: 'start' });
+    })
+    .onChange((event) => {
+      'worklet';
+      runOnJS(invokeVerticalSwipe)({
+        phase: 'update',
+        translationY: event.translationY,
+      });
+    })
+    .onEnd((event) => {
+      'worklet';
+      runOnJS(invokeVerticalSwipe)({
+        phase: 'end',
+        translationY: event.translationY,
+        velocityY: event.velocityY,
+        direction: event.translationY >= 0 ? 'down' : 'up',
+      });
+    })
+    .onFinalize(() => {
+      'worklet';
+      runOnJS(invokeVerticalSwipe)({ phase: 'finalize' });
     });
 
   const containerStyle = useAnimatedStyle(
@@ -209,9 +231,13 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   }, [childrenSize, translate, scale]);
 
   const composedTapGesture = Gesture.Exclusive(tap, longPress);
+  const composedGesture = Gesture.Simultaneous(
+    pinch,
+    Gesture.Race(pan, composedTapGesture)
+  );
 
   return (
-    <GestureDetector gesture={Gesture.Simultaneous(composedTapGesture, Gesture.Race(pinch, pan))}>
+    <GestureDetector gesture={composedGesture}>
       <Animated.View style={containerStyle} ref={containerRef}>
         <Animated.View style={childStyle}>{children}</Animated.View>
       </Animated.View>
