@@ -43,6 +43,7 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
 
   const translate = useVector(0, 0);
   const scale = useSharedValue<number>(1);
+  const isZoomed = useSharedValue<boolean>(false);
 
   const position = useVector(0, 0);
   const origin = useVector(0, 0);
@@ -139,11 +140,21 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     .onEnd((e) => {
       onPinchEnd && runOnJS(onPinchEnd)(e);
 
-      translate.x.value = withTiming(0, timingConfig);
-      translate.y.value = withTiming(0, timingConfig);
-      scale.value = withTiming(1, timingConfig, (_) => {
+      // Don't snap back automatically - preserve zoom state
+      if (scale.value <= 1) {
+        // If zoomed out to 1 or less, snap back to normal
+        translate.x.value = withTiming(0, timingConfig);
+        translate.y.value = withTiming(0, timingConfig);
+        scale.value = withTiming(1, timingConfig, (_) => {
+          isZoomed.value = false;
+          onGestureEnd && runOnJS(onGestureEnd)();
+        });
+      } else {
+        // If zoomed in, preserve the current state and mark as zoomed
+        isZoomed.value = true;
+        // Optionally call onGestureEnd to signal the gesture completed
         onGestureEnd && runOnJS(onGestureEnd)();
-      });
+      }
     });
 
   if (scrollRef !== undefined) {
@@ -174,6 +185,35 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     }
   };
 
+  // Pan gesture for moving around when zoomed in (Instagram-style)
+  const zoomPan = Gesture.Pan()
+    .withTestId('zoomPan')
+    .enabled(gesturesEnabled)
+    .maxPointers(1)
+    .minDistance(5)
+    .onStart(() => {
+      // Store the initial translation values when pan starts
+    })
+    .onChange((e) => {
+      // Only allow panning when zoomed in
+      if (scale.value > 1) {
+        translate.x.value = e.translationX;
+        translate.y.value = e.translationY;
+      }
+    })
+    .onEnd(() => {
+      // When finger is lifted, snap back to normal state
+      if (scale.value > 1) {
+        translate.x.value = withTiming(0, timingConfig);
+        translate.y.value = withTiming(0, timingConfig);
+        scale.value = withTiming(1, timingConfig, (_) => {
+          isZoomed.value = false;
+          onGestureEnd && runOnJS(onGestureEnd)();
+        });
+      }
+    });
+
+  // Vertical swipe pan gesture (for dismissing)
   const pan = Gesture.Pan()
     .withTestId('pan')
     .enabled(gesturesEnabled)
@@ -233,7 +273,7 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const composedTapGesture = Gesture.Exclusive(tap, longPress);
   const composedGesture = Gesture.Simultaneous(
     pinch,
-    Gesture.Race(pan, composedTapGesture)
+    Gesture.Race(zoomPan, pan, composedTapGesture)
   );
 
   return (
