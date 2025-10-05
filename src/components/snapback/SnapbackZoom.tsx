@@ -149,7 +149,7 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const tap = Gesture.Tap()
     .withTestId('tap')
     .enabled(gesturesEnabled)
-    .maxDuration(250)
+    .maxDuration(120)
     .numberOfTaps(1)
     .runOnJS(true)
     .onEnd((e) => onTap?.(e));
