@@ -162,17 +162,18 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
     .runOnJS(true)
     .onStart((e) => onLongPress?.(e));
 
-  // Add pan gesture for vertical swipe to dismiss - make it more restrictive
+  // Add pan gesture for vertical swipe to dismiss - only activate for clear vertical swipes
   const pan = Gesture.Pan()
     .withTestId('pan')
     .enabled(gesturesEnabled)
     .maxPointers(1)
-    .minDistance(50) // Require more movement before activating
-    .activeOffsetY([-10, 10]) // Only activate for significant vertical movement
-    .failOffsetX([-20, 20]) // Fail if there's too much horizontal movement
+    .minDistance(80) // Require significant movement
+    .activeOffsetY([-30, 30]) // Only activate for substantial vertical movement
+    .failOffsetX([-15, 15]) // Fail if there's any significant horizontal movement
+    .activateAfterLongPress(200) // Don't activate immediately - wait a bit
     .runOnJS(true)
     .onEnd((e) => {
-      const isVerticalSwipe = Math.abs(e.velocityY) > Math.abs(e.velocityX) && Math.abs(e.velocityY) > 800;
+      const isVerticalSwipe = Math.abs(e.velocityY) > Math.abs(e.velocityX) && Math.abs(e.velocityY) > 1000;
       if (isVerticalSwipe) {
         // Call specific vertical swipe callback if provided, otherwise fallback to onGestureEnd
         if (onVerticalSwipe) {
@@ -210,7 +211,7 @@ const SnapbackZoom: React.FC<SnapBackZoomProps> = ({
   const composedTapGesture = Gesture.Exclusive(tap, longPress);
 
   return (
-    <GestureDetector gesture={Gesture.Race(pinch, pan, composedTapGesture)}>
+    <GestureDetector gesture={Gesture.Simultaneous(composedTapGesture, Gesture.Race(pinch, pan))}>
       <Animated.View style={containerStyle} ref={containerRef}>
         <Animated.View style={childStyle}>{children}</Animated.View>
       </Animated.View>
